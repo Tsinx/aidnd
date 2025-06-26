@@ -74,20 +74,31 @@ class GameWorkflow(BaseWorkflow):
 
     def _extract_json(self, text: str) -> dict:
         """Extracts and repairs a JSON object from a string."""
-        # Regex to find a JSON block, even with missing closing braces
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
-        if not json_match:
-            json_match = re.search(r'(\{.*)', text, re.DOTALL) # Fallback for raw JSON
+        # Regex to find a JSON block within markdown
+        json_markdown_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
         
-        if json_match:
-            json_str = json_match.group(1)
-            try:
-                # Use json_repair to fix common syntax errors
-                return json.loads(repair_json(json_str))
-            except (json.JSONDecodeError, ValueError) as e:
-                print(f"Failed to parse JSON: {e}\nRaw string: {json_str}")
+        if json_markdown_match:
+            json_str = json_markdown_match.group(1)
+            logging.info("Extracted JSON from markdown code block.")
+        else:
+            # Fallback for raw JSON, attempting to find the start of a JSON object
+            raw_json_match = re.search(r'(\{.*)', text, re.DOTALL)
+            if raw_json_match:
+                json_str = raw_json_match.group(1)
+                logging.warning("Extracted JSON using fallback regex. This might be less reliable.")
+            else:
+                logging.error("No JSON object found in the text.")
                 return None
-        return None
+
+        try:
+            # Use json_repair to fix common syntax errors
+            repaired_json_str = repair_json(json_str)
+            if repaired_json_str != json_str:
+                logging.info(f"json_repair made changes to the JSON string. Original: {json_str}, Repaired: {repaired_json_str}")
+            return json.loads(repaired_json_str)
+        except (json.JSONDecodeError, ValueError) as e:
+            logging.error(f"Failed to parse JSON: {e}\nRaw string: {json_str}\nRepaired string attempt: {repaired_json_str if 'repaired_json_str' in locals() else 'N/A'}")
+            return None
 
     def get_briefing(self) -> str:
         return "Manages the entire game flow by orchestrating a sequence of specialized agents (Planner, Executor, Tool Caller) to interpret user input, form a plan, and generate a narrative response."
@@ -225,15 +236,26 @@ class GameWorkflow(BaseWorkflow):
                 # 6. Execute the tool and add the result to main memory
                 try:
                     # This assumes the tool's execute method matches the parameters
-                    tool_result = target_tool.execute_with_parameters(
-                        parameters=filled_params,
-                        stream_callback=stream_callback # Pass the main callback for narrative output
-                    )
-                    if tool_result:
+                    if tool_name == "CharacterCreationWorkflow":
+                        # CharacterCreationWorkflow.execute_with_parameters is a generator
+                        result_parts = []
+                        # The stream_callback for CharacterCreationWorkflow's output should be the main one
+                        for part in target_tool.execute_with_parameters(parameters=filled_params, stream_callback=stream_callback):
+                            result_parts.append(str(part)) # Ensure it's a string
+                        tool_result = "\n".join(result_parts)
+                        # The result is already streamed by CharacterCreationWorkflow if it uses the callback.
+                        # If not, tool_result contains the final message.
+                    else:
+                        tool_result = target_tool.execute_with_parameters(
+                            parameters=filled_params,
+                            stream_callback=stream_callback # Pass the main callback for narrative output
+                        )
+
+                    if tool_result: # tool_result here is now a string or None
                         main_memory.append(f"**Result from `{tool_name}`:**\n{tool_result}")
                     sidebar_writer(f"**Success:** `{tool_name}` executed successfully.\n")
                 except Exception as e:
-                    error_message = f"**Error:** Failed to execute tool `{tool_name}`: {e}"
+                    error_message = f"**Error:** Failed to execute tool `{tool_name}`: {e} (Tool type: {type(target_tool).__name__})"
                     main_memory.append(error_message)
                     sidebar_writer(f"{error_message}\n")
                     break # Stop the loop on tool execution failure

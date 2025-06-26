@@ -153,8 +153,19 @@ class CharacterCreationWorkflow(BaseWorkflow):
                 tool_result = target_tool.execute_with_parameters(filled_params, self.game_state)
                 main_memory.append(f"**Tool Output for `{tool_name}`:**\n{tool_result}")
 
-        final_output = main_memory[-1] 
-        yield final_output
+        final_output = main_memory[-1]  # This is typically the result of the last tool call
+
+        if stream_callback:
+            # If a stream_callback is provided (e.g., by GameWorkflow),
+            # stream the final output directly.
+            stream_callback(final_output)
+            # Yield something to indicate completion if necessary, or just return.
+            # Since the caller in GameWorkflow iterates, we should yield.
+            # Yielding an empty string as the "result" since it's already streamed.
+            yield ""
+        else:
+            # If no stream_callback, yield the final output as the result.
+            yield final_output
 
     def _get_stream_writer(self, container):
         if not container:
@@ -168,15 +179,28 @@ class CharacterCreationWorkflow(BaseWorkflow):
         return writer
 
     def _extract_json(self, text: str) -> dict:
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
-        if not json_match:
-            json_match = re.search(r'(\{.*)', text, re.DOTALL)
+        # Regex to find a JSON block within markdown
+        json_markdown_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
         
-        if json_match:
-            json_str = json_match.group(1)
-            try:
-                return json.loads(repair_json(json_str))
-            except (json.JSONDecodeError, ValueError) as e:
-                print(f"Failed to parse JSON: {e}\nRaw string: {json_str}")
+        if json_markdown_match:
+            json_str = json_markdown_match.group(1)
+            logging.info("Extracted JSON from markdown code block.")
+        else:
+            # Fallback for raw JSON, attempting to find the start of a JSON object
+            raw_json_match = re.search(r'(\{.*)', text, re.DOTALL)
+            if raw_json_match:
+                json_str = raw_json_match.group(1)
+                logging.warning("Extracted JSON using fallback regex. This might be less reliable.")
+            else:
+                logging.error("No JSON object found in the text.")
                 return None
-        return None
+
+        try:
+            # Use json_repair to fix common syntax errors
+            repaired_json_str = repair_json(json_str)
+            if repaired_json_str != json_str:
+                logging.info(f"json_repair made changes to the JSON string. Original: {json_str}, Repaired: {repaired_json_str}")
+            return json.loads(repaired_json_str)
+        except (json.JSONDecodeError, ValueError) as e:
+            logging.error(f"Failed to parse JSON: {e}\nRaw string: {json_str}\nRepaired string attempt: {repaired_json_str if 'repaired_json_str' in locals() else 'N/A'}")
+            return None
