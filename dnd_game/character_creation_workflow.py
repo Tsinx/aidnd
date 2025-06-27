@@ -54,6 +54,8 @@ class CharacterCreationWorkflow(BaseWorkflow):
         }'''
 
     def execute_with_parameters(self, parameters: dict, stream_callback=None):
+        # here stream_callback is not used in the following part, just to keep the same interface as the base class and agent
+
         creation_guidance = parameters.get("creation_guidance")
 
         # Dynamically filter for player characters at the time of execution

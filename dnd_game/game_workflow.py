@@ -207,11 +207,11 @@ class GameWorkflow(BaseWorkflow):
                         sidebar_writer(f"**Error:** Tool Caller failed to produce valid JSON for `{tool_name}`. Aborting.")
                         break
 
-                    # Special handling for CharacterCreationWorkflow
-                    if tool_name == "CharacterCreationWorkflow":
-                        if "creation_guidance" in params_schema.get("properties", {}):
-                            # Use the original player_input as the creation_guidance
-                            filled_params["creation_guidance"] = player_input
+                    # Special handling for CharacterCreationWorkflow, but let's remove it and let the workflow handle it
+                    # if tool_name == "CharacterCreationWorkflow":
+                    #     if "creation_guidance" in params_schema.get("properties", {}):
+                    #         # Use the original player_input as the creation_guidance
+                    #         filled_params["creation_guidance"] = player_input
 
                     # Always add the thoughts container if the target tool accepts it
                     # The thoughts_container is now part of the workflow's state, so we don't need to pass it.
