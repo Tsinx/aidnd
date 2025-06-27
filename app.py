@@ -1,6 +1,6 @@
 import streamlit as st
 import logging
-from dnd_game.workflow import GameWorkflow
+from dnd_game.game_workflow import GameWorkflow
 from dnd_game.history import ConversationHistory
 from dnd_game.game_engine.game_state import GameState
 from dnd_game.game_engine.character import Character
