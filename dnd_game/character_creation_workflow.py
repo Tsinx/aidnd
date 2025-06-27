@@ -6,6 +6,7 @@ from .workflow_base import BaseWorkflow
 from .agents.character_creation_planner_agent import CharacterCreationPlannerAgent
 from .agents.executor_agent import ExecutorAgent
 from .agents.tool_caller_agent import ToolCallerAgent
+from .agents.character_summarization_agent import CharacterSummarizationAgent
 from .tools.character_tools import CreateCharacterTool, EditCharacterTool, AddToCharacterListAttributeTool, RemoveFromCharacterListAttributeTool, CreateAndGiveItemTool, EquipItemTool
 from .game_engine.character import Character
 
@@ -27,8 +28,10 @@ class CharacterCreationWorkflow(BaseWorkflow):
             "PlannerAgent": CharacterCreationPlannerAgent(model, self.history, character_template, [], k=self.k),
             "ExecutorAgent": ExecutorAgent(model, k=self.k),
             "ToolCallerAgent": ToolCallerAgent(model, k=self.k),
+            "SummarizationAgent": CharacterSummarizationAgent(model, k=self.k),
         }
-
+        """
+        # tools are temporary removed, they will be added after testing the workflow
         self.tools = {
             tool.name: {"agent": tool, "briefing": tool.get_briefing()}
             for tool in [
@@ -40,6 +43,8 @@ class CharacterCreationWorkflow(BaseWorkflow):
                 EquipItemTool(),
             ]
         }
+        """
+        self.tools = {}
 
     def get_briefing(self) -> str:
         return "Guides the user through character creation, including setting background, stats, buffs, items, and equipment."
@@ -155,8 +160,20 @@ class CharacterCreationWorkflow(BaseWorkflow):
                 tool_result = target_tool.execute_with_parameters(filled_params, self.game_state)
                 main_memory.append(f"**Tool Output for `{tool_name}`:**\n{tool_result}")
 
-        final_output = main_memory[-1] 
-        yield final_output
+        # Summarize the entire process
+        summarization_params = {
+            "creation_log": "\n".join(main_memory)
+        }
+        final_character_sheet = self.agents["SummarizationAgent"].execute_with_parameters(
+            parameters=summarization_params,
+            stream_callback=sidebar_writer
+        )
+
+        # Write the final character sheet to the sidebar
+        sidebar_writer("\n--- **Final Character Sheet** ---\n")
+        sidebar_writer(final_character_sheet)
+
+        return final_character_sheet
 
     def _get_stream_writer(self, container):
         if not container:

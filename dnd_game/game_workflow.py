@@ -50,7 +50,8 @@ class GameWorkflow(BaseWorkflow):
                 "briefing": agent.get_briefing()
             }
             for name, agent in agents.items()
-            if name in ["WorldCreatorAgent", "StoryTellerAgent", "GreetingAgent"]
+            if name in ["WorldCreatorAgent", "StoryTellerAgent"] # try to remove "GreetingAgent"
+            # if name in ["WorldCreatorAgent", "StoryTellerAgent", "GreetingAgent"] 
         }
 
         # Add workflows to the list of available tools for the planner

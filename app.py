@@ -8,6 +8,110 @@ from utils import load_model
 
 st.set_page_config(layout="wide")
 
+# 添加自定义CSS和JS
+st.markdown("""
+<style>
+    /* 使sidebar内的文本可以自动换行 */
+    .css-1d391kg, .stMarkdown {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+    }
+</style>
+<script>
+    function stTabsHover() {
+        const tabButtons = window.parent.document.querySelectorAll('div[data-baseweb="tab"]');
+        tabButtons.forEach((button) => {
+            button.addEventListener('mouseover', () => {
+                if (button.getAttribute('aria-selected') === 'false') {
+                    button.click();
+                }
+            });
+        });
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    let mainUserScrolled = false;
+    let sidebarUserScrolled = false;
+    let lastMainHeight = 0;
+    let lastSidebarHeight = 0;
+    let currentSidebarPanel = null;
+
+    function isAtBottom(element) {
+        return Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 50;
+    }
+
+    function autoScroll() {
+        const mainSection = window.parent.document.querySelector('section.main');
+        if (mainSection) {
+            if (!mainUserScrolled || isAtBottom(mainSection)) {
+                const currentHeight = mainSection.scrollHeight;
+                if (currentHeight > lastMainHeight) {
+                    mainSection.scrollTop = mainSection.scrollHeight;
+                }
+                lastMainHeight = currentHeight;
+            }
+        }
+
+        const activeSidebarPanel = window.parent.document.querySelector('[data-testid="stSidebar"] [role="tabpanel"]:not([hidden])');
+        if (activeSidebarPanel) {
+            if (!sidebarUserScrolled || isAtBottom(activeSidebarPanel)) {
+                const currentHeight = activeSidebarPanel.scrollHeight;
+                if (currentHeight > lastSidebarHeight) {
+                    activeSidebarPanel.scrollTop = activeSidebarPanel.scrollHeight;
+                }
+                lastSidebarHeight = currentHeight;
+            }
+        }
+    }
+
+    const debouncedAutoScroll = debounce(autoScroll, 100);
+
+    function setupScrollListeners() {
+        const mainSection = window.parent.document.querySelector('section.main');
+        if (mainSection && !mainSection.hasAttribute('data-scroll-listener-attached')) {
+            mainSection.setAttribute('data-scroll-listener-attached', 'true');
+            mainSection.addEventListener('scroll', () => {
+                mainUserScrolled = !isAtBottom(mainSection);
+            });
+        }
+
+        const activeSidebarPanel = window.parent.document.querySelector('[data-testid="stSidebar"] [role="tabpanel"]:not([hidden])');
+        if (activeSidebarPanel && activeSidebarPanel !== currentSidebarPanel) {
+            currentSidebarPanel = activeSidebarPanel;
+            sidebarLastHeight = activeSidebarPanel.scrollHeight;
+            sidebarUserScrolled = false;
+            activeSidebarPanel.addEventListener('scroll', () => {
+                sidebarUserScrolled = !isAtBottom(activeSidebarPanel);
+            });
+        }
+    }
+
+    const observer = new MutationObserver(() => {
+        stTabsHover();
+        setupScrollListeners();
+        debouncedAutoScroll();
+    });
+
+    observer.observe(window.parent.document.body, {
+        childList: true,
+        subtree: true,
+    });
+
+    setupScrollListeners();
+</script>
+""", unsafe_allow_html=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -23,26 +127,12 @@ st.title("D&D AI Dungeon Master")
 def initialize_session_state():
     if 'llm' not in st.session_state:
         try:
-            llm = load_model()
-            st.session_state.llm = llm
-            st.session_state.model = llm
+            st.session_state.llm = load_model()
+            st.session_state.model = st.session_state.llm
             st.session_state.history = ConversationHistory(st.session_state.llm, k=5)
-            if 'game_state' not in st.session_state:
-                st.session_state.game_state = GameState()
-            st.sidebar.title("DM's Brain")
-            st.sidebar.markdown("### Story Summary")
-            summary_text = st.session_state.history.get_latest_summary()
-            st.sidebar.markdown(f"""> {summary_text.replace('\n', '\n> ')}
-""")
-            st.sidebar.markdown("### High-Level Summary")
-            super_summary_text = st.session_state.history.get_latest_super_summary()
-            st.sidebar.markdown(f"""> {super_summary_text.replace('\n', '\n> ')}""")
-            st.sidebar.markdown("---")
-            thoughts_container = st.sidebar.container()
-            thoughts_container.write("The inner workings of the agents will appear here...")
-            st.session_state.thoughts_container = thoughts_container
-
-            st.session_state.game_workflow = GameWorkflow(model=st.session_state.model, history=st.session_state.history, game_state=st.session_state.game_state, thoughts_container=st.session_state.thoughts_container, k=5)
+            st.session_state.game_state = GameState()
+            # We will create the thoughts_container placeholder here, but populate it in the main script body
+            st.session_state.thoughts_container = None 
         except Exception as e:
             st.error(f"Failed to load model: {e}")
             st.stop()
@@ -61,7 +151,41 @@ def initialize_session_state():
 
 initialize_session_state()
 
+# --- Sidebar Rendering (runs on every script run) ---
+def render_sidebar():
+    st.sidebar.title("DM's Brain")
+    hist_tab, thought_tab = st.sidebar.tabs(["History", "Thinking Process"])
 
+    with hist_tab:
+        st.markdown("### Story Summary")
+        summary_text = st.session_state.history.get_latest_summary()
+        if summary_text and not summary_text.startswith('[PENDING'):
+            st.markdown(f"""> {summary_text.replace('\n', '\n> ')}""") 
+        st.markdown("### High-Level Summary")
+        super_summary_text = st.session_state.history.get_latest_super_summary()
+        if super_summary_text and not super_summary_text.startswith('[PENDING'):
+            st.markdown(f"""> {super_summary_text.replace('\n', '\n> ')}""") 
+
+    with thought_tab:
+        # This container will be populated during the game workflow
+        st.session_state.thoughts_container = st.container()
+        st.session_state.thoughts_container.write("The inner workings of the agents will appear here...")
+
+# Initialize the workflow after the containers are ready
+if 'game_workflow' not in st.session_state:
+    st.session_state.game_workflow = GameWorkflow(
+        model=st.session_state.model, 
+        history=st.session_state.history, 
+        game_state=st.session_state.game_state, 
+        thoughts_container=st.session_state.thoughts_container, 
+        k=5
+    )
+else:
+    # Update the container on each run
+    st.session_state.game_workflow.thoughts_container = st.session_state.thoughts_container
+
+# Render the sidebar
+render_sidebar()
 
 # --- Main Chat Interface ---
 # Display chat messages from history
