@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional, TYPE_CHECKING
 
@@ -79,8 +80,9 @@ class BaseAgent(ABC):
             full_response += text_chunk
             if stream_callback:
                 stream_callback(text_chunk)
-        
-        if stream_callback:
-            return # Data is streamed, no return value needed
 
+        # Log the full response for debugging purposes, especially for tool callers
+        logging.info(f"Agent {self.__class__.__name__} generated response: {full_response}")
+
+        # whether the chunk is streamed to the front end, return a full response to back end
         return full_response

@@ -227,7 +227,7 @@ class GameWorkflow(BaseWorkflow):
                     # This assumes the tool's execute method matches the parameters
                     tool_result = target_tool.execute_with_parameters(
                         parameters=filled_params,
-                        stream_callback=stream_callback # Pass the main callback for narrative output
+                        stream_callback=sidebar_writer
                     )
                     if tool_result:
                         main_memory.append(f"**Result from `{tool_name}`:**\n{tool_result}")
@@ -251,8 +251,13 @@ class GameWorkflow(BaseWorkflow):
         narrative_params = {
             "narrative_context": final_scratchpad
         }
+        # Unlike other agents that return a complete string, NarrativeAgent is special.
+        # It overrides its execution method to use 'yield', creating a generator.
+        # This is done specifically to stream its output chunk by chunk to the main UI,
+        # allowing the user to see the final story unfold in real-time.
+        # Therefore, this variable holds a generator, not a string.
         final_response_generator = self.agents["NarrativeAgent"].execute_with_parameters(
-            parameters=narrative_params,
-            stream_callback=sidebar_writer
+            parameters=narrative_params
         )
+        # The generator is returned for completeness, but the streaming is handled by the callback.
         return final_response_generator
