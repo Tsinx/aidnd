@@ -68,7 +68,7 @@ class BaseAgent(ABC):
         response_stream = self.model(
             prompt,
             max_tokens=max_tokens,
-            stop= ["<|file_separator|>", "<|eot_id|>"],
+            stop= ["<|file_separator|>", "<|eot_id|>", "<|end_of_text|>"],
             temperature=0.1, # Lower temperature to reduce randomness
             echo=False,
             stream=True  # Always stream to handle callbacks

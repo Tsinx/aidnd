@@ -30,7 +30,7 @@ class NarrativeAgent(BaseAgent):
         response_stream = self.model(
             prompt,
             max_tokens=8192,
-            stop=["<|file_separator|>", "<|eot_id|>"],
+            stop=["<|file_separator|>", "<|eot_id|>", "<|end_of_text|>"],
             temperature=0.1, # Lower temperature to reduce randomness
             echo=False,
             stream=True

@@ -66,6 +66,7 @@ class CharacterCreationWorkflow(BaseWorkflow):
         # Dynamically filter for player characters at the time of execution
         player_characters = [char for char in self.all_characters if char.is_player]
         self.agents["PlannerAgent"].update_player_characters(player_characters)
+        logging.info(f"CharacterCreationWorkflow executing with parameters: {parameters}")
         sidebar_writer = self._get_stream_writer(self.thoughts_container)
 
         available_tools = [
@@ -86,10 +87,12 @@ class CharacterCreationWorkflow(BaseWorkflow):
                 "max_turns": max_turns,
                 "guidance": creation_guidance
             }
+            logging.info(f"CharacterCreationWorkflow planner_params: {planner_params}")
             plan_text = self.agents["PlannerAgent"].execute_with_parameters(
                 parameters=planner_params,
                 stream_callback=sidebar_writer
             )
+            logging.info(f"CharacterCreationWorkflow plan_text: {plan_text}")
             main_memory.append(f"**Planner's Plan:**\n{plan_text}")
 
             executor_params = {

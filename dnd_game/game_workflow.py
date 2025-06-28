@@ -155,13 +155,15 @@ class GameWorkflow(BaseWorkflow):
             execution_status = executor_command.get("current_execution")
             tool_name = executor_command.get("tool_name")
 
-            sidebar_writer(f"**Executor's Action:** `{execution_status}`")
+            sidebar_writer(f"\n**Executor's Action:** `{execution_status}`")
             if tool_name:
                 sidebar_writer(f" on Tool: `{tool_name}`")
             sidebar_writer("\n")
 
             # 4. Handle Executor's decision
             if execution_status in ["task_complete", "ask_for_user_input"]:
+                # Add Executor's action to main memory in this branch since it's the final decision, executor_output is important in the last round especially when it conflicts the planner
+                main_memory.append(f"**Executor's Action:**\n{executor_output}")
                 sidebar_writer(f"**Info:** Loop ending. Reason: {execution_status}.")
                 break
             
@@ -221,7 +223,7 @@ class GameWorkflow(BaseWorkflow):
                 else:
                     sidebar_writer(f"**Info:** Tool `{tool_name}` requires no parameters. Executing directly.\n")
 
-                sidebar_writer(f"**Action:** Calling `{tool_name}` with params: `{json.dumps(filled_params)}`\n")
+                sidebar_writer(f"\n**Action:** Calling `{tool_name}` with params: `{json.dumps(filled_params)}`\n")
 
                 # 6. Execute the tool and add the result to main memory
                 try:
