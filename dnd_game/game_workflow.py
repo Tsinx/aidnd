@@ -107,7 +107,8 @@ class GameWorkflow(BaseWorkflow):
     def execute_with_parameters(self, parameters: dict, stream_callback=None):
         player_input = parameters.get("player_input")
         """Runs the new Planner -> Executor -> Tool Caller workflow."""
-        sidebar_writer = self._get_stream_writer(self.thoughts_container)
+        # Use the provided stream_callback, or create a default one from the container if none is given.
+        sidebar_writer = stream_callback if stream_callback else self._get_stream_writer(self.thoughts_container)
         available_tools_for_planner = [
             {"name": name, "briefing": data["briefing"]}
             for name, data in self.tools.items()
@@ -129,7 +130,7 @@ class GameWorkflow(BaseWorkflow):
             }
             plan_text = self.agents["PlannerAgent"].execute_with_parameters(
                 parameters=planner_params,
-                stream_callback=sidebar_writer
+                stream_callback=sidebar_writer # Pass the correct writer
             )
             main_memory.append(f"**Planner's Plan:**\n{plan_text}")
 
@@ -142,7 +143,7 @@ class GameWorkflow(BaseWorkflow):
             }
             executor_output = self.agents["ExecutorAgent"].execute_with_parameters(
                 parameters=executor_params,
-                stream_callback=sidebar_writer
+                stream_callback=sidebar_writer # Pass the correct writer
             )
             # NOTE: executor_output is NOT added to main_memory here. It's part of the temporary memory for the tool caller.
 
@@ -201,7 +202,7 @@ class GameWorkflow(BaseWorkflow):
                     }
                     tool_caller_output = self.agents["ToolCallerAgent"].execute_with_parameters(
                         parameters=tool_caller_params,
-                        stream_callback=sidebar_writer
+                        stream_callback=sidebar_writer # Pass the correct writer
                     )
 
                     # Parse Tool Caller's JSON
@@ -230,7 +231,7 @@ class GameWorkflow(BaseWorkflow):
                     # This assumes the tool's execute method matches the parameters
                     tool_result = target_tool.execute_with_parameters(
                         parameters=filled_params,
-                        stream_callback=sidebar_writer
+                        stream_callback=sidebar_writer # Pass the correct writer
                     )
                     if tool_result:
                         main_memory.append(f"**Result from `{tool_name}`:**\n{tool_result}")

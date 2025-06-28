@@ -59,15 +59,15 @@ class CharacterCreationWorkflow(BaseWorkflow):
         }'''
 
     def execute_with_parameters(self, parameters: dict, stream_callback=None):
-        # here stream_callback is not used in the following part, just to keep the same interface as the base class and agent
-
         creation_guidance = parameters.get("creation_guidance")
+
+        # Use the provided stream_callback, or create a default one from the container if none is given.
+        sidebar_writer = stream_callback if stream_callback else self._get_stream_writer(self.thoughts_container)
 
         # Dynamically filter for player characters at the time of execution
         player_characters = [char for char in self.all_characters if char.is_player]
         self.agents["PlannerAgent"].update_player_characters(player_characters)
         logging.info(f"CharacterCreationWorkflow executing with parameters: {parameters}")
-        sidebar_writer = self._get_stream_writer(self.thoughts_container)
 
         available_tools = [
             {"name": name, "briefing": data["briefing"]}
@@ -90,7 +90,7 @@ class CharacterCreationWorkflow(BaseWorkflow):
             logging.info(f"CharacterCreationWorkflow planner_params: {planner_params}")
             plan_text = self.agents["PlannerAgent"].execute_with_parameters(
                 parameters=planner_params,
-                stream_callback=sidebar_writer
+                stream_callback=sidebar_writer # Pass the correct writer
             )
             logging.info(f"CharacterCreationWorkflow plan_text: {plan_text}")
             main_memory.append(f"**Planner's Plan:**\n{plan_text}")
@@ -102,7 +102,7 @@ class CharacterCreationWorkflow(BaseWorkflow):
             }
             executor_output = self.agents["ExecutorAgent"].execute_with_parameters(
                 parameters=executor_params,
-                stream_callback=sidebar_writer
+                stream_callback=sidebar_writer # Pass the correct writer
             )
 
             executor_command = self._extract_json(executor_output)
@@ -152,7 +152,7 @@ class CharacterCreationWorkflow(BaseWorkflow):
                     }
                     tool_caller_output = self.agents["ToolCallerAgent"].execute_with_parameters(
                         parameters=tool_caller_params,
-                        stream_callback=sidebar_writer
+                        stream_callback=sidebar_writer # Pass the correct writer
                     )
 
                     filled_params = self._extract_json(tool_caller_output)
@@ -169,7 +169,7 @@ class CharacterCreationWorkflow(BaseWorkflow):
         }
         final_character_sheet = self.agents["SummarizationAgent"].execute_with_parameters(
             parameters=summarization_params,
-            stream_callback=sidebar_writer
+            stream_callback=sidebar_writer # Pass the correct writer
         )
 
         # Write the final character sheet to the sidebar
